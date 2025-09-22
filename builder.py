@@ -197,7 +197,7 @@ def main():
     with open(panda_loader_path, 'w', encoding='utf-8') as f:
         f.write(panda_loader_content)
     print(f"{GREEN}[*] Updated PandaLoader.cpp with customized values.{RESET}")
-    build_command = 'g++ -std=c++17 -masm=intel -w PandaLoader.cpp -Os -static -mwindows -s -Wl,--gc-sections -lwininet -lpsapi -o PandaLoader.exe'
+    build_command = 'g++ -w PandaLoader.cpp -O3 -std=c++17 -masm=intel -static -fno-stack-protector -fno-threadsafe-statics -fvisibility=hidden -fdata-sections -ffunction-sections -fno-exceptions -mwindows -s -Wl,--gc-sections -flto -pipe -lwininet -lpsapi -o PandaLoader.exe'
     print(f"{YELLOW}[*] Building PandaLoader.exe...{RESET}")
     result = subprocess.run(build_command, shell=True, capture_output=True, text=True)
     if result.returncode == 0:
