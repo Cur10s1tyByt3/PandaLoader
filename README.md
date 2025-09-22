@@ -57,7 +57,7 @@ It then allocates memory in the target process using `VirtualAllocEx`, with `MEM
 The decrypted shellcode is written into the allocated memory using `WriteProcessMemory`.
 After writing the shellcode, the memory permissions are adjusted to `PAGE_EXECUTE_READ` using `VirtualProtect` to reduce the chances of detection by security software.
 - Shellcode Execution :
-The shellcode is executed by queuing it as an APC (Asynchronous Procedure Call) to the suspended process thread using `QueueUserAPC`.
+The shellcode is executed by queuing it as an `APC` (Asynchronous Procedure Call) to the suspended process thread using `QueueUserAPC`.
 The thread is then resumed using `ResumeThread`, which causes the shellcode to be executed in the context of the target process.
 - Persistence and Cleanup :
 If persistence is enabled `ENABLE_STARTUP`, the loader copies itself to a specific directory and creates a scheduled task to run on startup.
