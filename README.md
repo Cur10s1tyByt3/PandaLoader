@@ -46,7 +46,7 @@ Machine Process Count: It checks if the number of running processes is below 100
 ETW (Event Tracing for Windows) Patch: It patches functions related to `ETW` to prevent the logging of events, which could be used for analysis.
 If any `VM` indicators are detected, the loader will terminate.
 - Payload Retrieval :
-The shellcode is downloaded from a remote URL specified in the `SHELLCODE_URL` when using the builder.
+The shellcode is downloaded from a remote `URL` specified in the `SHELLCODE_URL` when using the builder.
 It uses the WinINet API to download the payload into a `std::vector<BYTE>` buffer.
 - Payload Decryption :
 The decryption key is specified by the `XOR_DECRYPTION_KEY` which is the one generated using the builder.
